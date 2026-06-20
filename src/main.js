@@ -7,6 +7,9 @@ const stateLabel = document.getElementById("stateLabel");
 const hintLabel = document.getElementById("hintLabel");
 const overlay = document.getElementById("overlay");
 const startGuide = document.getElementById("startGuide");
+const deductionPanel = document.getElementById("deductionPanel");
+const evidenceSummary = document.getElementById("evidenceSummary");
+const suspectChoices = document.getElementById("suspectChoices");
 const startButton = document.getElementById("startButton");
 
 const keys = new Set();
@@ -18,36 +21,56 @@ const roadTopHalf = 230;
 const maxDepth = 1180;
 const minSafeDistance = 260;
 const maxSafeDistance = 720;
-const itemEvidence = {
-  wallet: {
-    label: "Wallet",
-    culpritScore: 2,
-    innocentScore: 0,
-    culpritClue: "cash from the crime scene",
-    innocentClue: "ordinary receipts",
-  },
-  key: {
-    label: "Key",
-    culpritScore: 1,
-    innocentScore: 0,
-    culpritClue: "a key matching the back entrance",
-    innocentClue: "a house key",
-  },
-  card: {
-    label: "Access Card",
-    culpritScore: 2,
-    innocentScore: 0,
-    culpritClue: "an access card used near the incident",
-    innocentClue: "an expired transit card",
-  },
-  note: {
-    label: "Coded Note",
-    culpritScore: 3,
-    innocentScore: 0,
-    culpritClue: "a coded note naming the meeting point",
-    innocentClue: "a shopping memo",
-  },
+const itemDisplay = {
+  wallet: "財布",
+  key: "鍵",
+  card: "カード",
+  note: "メモ",
 };
+const culpritScenarios = [
+  {
+    id: "insider",
+    name: "内部協力者",
+    description: "施設の入退室情報を使って犯行を手引きした人物。",
+    speedMultiplier: 1.55,
+    items: [
+      { kind: "card", clue: "事件現場付近の入館カード" },
+      { kind: "key", clue: "裏口の予備鍵" },
+      { kind: "note", clue: "警備交代時刻のメモ" },
+      { kind: "wallet", clue: "施設職員証の入った財布" },
+      { kind: "note", clue: "内部用通路の手書き地図" },
+      { kind: "card", clue: "管理区域の仮パス" },
+    ],
+  },
+  {
+    id: "broker",
+    name: "情報屋",
+    description: "盗んだ情報を第三者へ売ろうとしていた人物。",
+    speedMultiplier: 1.7,
+    items: [
+      { kind: "note", clue: "受け渡し場所を示す暗号メモ" },
+      { kind: "card", clue: "匿名プリペイドカード" },
+      { kind: "wallet", clue: "不自然に多い現金" },
+      { kind: "key", clue: "貸しロッカーの鍵" },
+      { kind: "note", clue: "情報の値段を書いたメモ" },
+      { kind: "card", clue: "偽名で作られた会員カード" },
+    ],
+  },
+  {
+    id: "lookout",
+    name: "見張り役",
+    description: "逃走経路を確保し、仲間に合図を送っていた人物。",
+    speedMultiplier: 1.85,
+    items: [
+      { kind: "key", clue: "逃走車両の鍵" },
+      { kind: "note", clue: "合図の時刻表" },
+      { kind: "wallet", clue: "偽名の身分証が入った財布" },
+      { kind: "card", clue: "駐車場の精算カード" },
+      { kind: "note", clue: "見張り位置を示す簡単な図" },
+      { kind: "key", clue: "非常階段の鍵" },
+    ],
+  },
+];
 const initialCovers = [
   { id: "pole-1", kind: "pole", side: -1, depth: 220, laneX: -0.64, width: 0.09 },
   { id: "post-1", kind: "postbox", side: 1, depth: 360, laneX: 0.55, width: 0.17 },
@@ -67,7 +90,9 @@ const state = {
   targetSpeed: 46,
   targetAction: "walking",
   actionTimer: 2.5,
-  targetIsCulprit: false,
+  culpritScenario: null,
+  dropSequence: [],
+  deductionOpen: false,
   itemDropTimer: 1.6,
   itemsDropped: 0,
   itemsCollected: 0,
@@ -95,7 +120,9 @@ function resetGame() {
   state.targetSpeed = 46;
   state.targetAction = "walking";
   state.actionTimer = 2.5;
-  state.targetIsCulprit = Math.random() < 0.5;
+  state.culpritScenario = culpritScenarios[Math.floor(Math.random() * culpritScenarios.length)];
+  state.dropSequence = shuffle([...state.culpritScenario.items]).slice(0, state.requiredItems);
+  state.deductionOpen = false;
   state.itemDropTimer = 1.6;
   state.itemsDropped = 0;
   state.itemsCollected = 0;
@@ -109,6 +136,8 @@ function resetGame() {
   state.message = "Keep the target in range.";
   resetCovers();
   droppedItems.splice(0, droppedItems.length);
+  deductionPanel.hidden = true;
+  suspectChoices.innerHTML = "";
   overlay.classList.remove("visible");
 }
 
@@ -145,6 +174,14 @@ function project(depth, laneX = 0) {
 
 function resetCovers() {
   covers.splice(0, covers.length, ...initialCovers.map((cover) => ({ ...cover })));
+}
+
+function shuffle(items) {
+  for (let index = items.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [items[index], items[swapIndex]] = [items[swapIndex], items[index]];
+  }
+  return items;
 }
 
 function moveWorldObjects(delta) {
@@ -238,7 +275,7 @@ function update(dt) {
   }
 
   if (state.alert >= 1) endGame(false, "発見", "尾行対象に気づかれてしまいました。");
-  if (state.itemsCollected >= state.requiredItems) endGame(true, "CLEAR", buildInvestigationResult());
+  if (state.itemsCollected >= state.requiredItems && !state.deductionOpen) showDeductionPhase();
 
   moveWorldObjects(worldDelta);
   updateHud();
@@ -277,7 +314,7 @@ function updateTargetBehavior(dt) {
     drifting: 52,
     hurrying: 96,
   };
-  const culpritSpeedMultiplier = state.targetIsCulprit ? 1.7 : 1;
+  const culpritSpeedMultiplier = state.culpritScenario ? state.culpritScenario.speedMultiplier : 1;
   const targetActionSpeed = speedByAction[state.targetAction] * culpritSpeedMultiplier;
   state.targetSpeed += (targetActionSpeed - state.targetSpeed) * Math.min(1, dt * 3.8);
   state.targetX += (state.targetGoalX - state.targetX) * Math.min(1, dt * 2.4);
@@ -307,14 +344,11 @@ function updateDroppedItems(dt, worldDelta) {
 }
 
 function dropItem() {
-  const itemKinds = Object.keys(itemEvidence);
-  const kind = itemKinds[Math.floor(Math.random() * itemKinds.length)];
-  const evidence = itemEvidence[kind];
+  const scenarioItem = state.dropSequence[state.itemsDropped % state.dropSequence.length];
   droppedItems.push({
     id: `item-${state.itemsDropped + 1}`,
-    kind,
-    evidenceScore: state.targetIsCulprit ? evidence.culpritScore : evidence.innocentScore,
-    clue: state.targetIsCulprit ? evidence.culpritClue : evidence.innocentClue,
+    kind: scenarioItem.kind,
+    clue: scenarioItem.clue,
     depth: clamp(state.distance - 85, 240, 780),
     laneX: clamp(state.targetX + (Math.random() - 0.5) * 0.18, -0.48, 0.48),
     spin: Math.random() * Math.PI * 2,
@@ -393,14 +427,45 @@ function coverBlockWidth(kind) {
   return 0.12;
 }
 
-function buildInvestigationResult() {
+function showDeductionPhase() {
+  state.running = false;
+  state.ended = true;
+  state.deductionOpen = true;
+  stateLabel.textContent = "推理";
+  hintLabel.textContent = "回収した証拠から犯人を選んでください。";
+  overlay.querySelector("h1").textContent = "推理フェーズ";
+  overlay.querySelector("p").textContent = "集めた落とし物を確認し、どの犯人だったかを選択してください。";
+  startGuide.style.display = "none";
+  startButton.hidden = true;
+  deductionPanel.hidden = false;
+  evidenceSummary.innerHTML = buildEvidenceSummary();
+  suspectChoices.innerHTML = "";
+
+  for (const suspect of culpritScenarios) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.innerHTML = `<strong>${suspect.name}</strong><br><span>${suspect.description}</span>`;
+    button.addEventListener("click", () => finishDeduction(suspect.id));
+    suspectChoices.appendChild(button);
+  }
+
+  overlay.classList.add("visible");
+}
+
+function buildEvidenceSummary() {
   const collected = droppedItems.filter((item) => item.collected);
-  const score = collected.reduce((total, item) => total + item.evidenceScore, 0);
-  const clues = collected.map((item) => `${itemEvidence[item.kind].label}: ${item.clue}`).join("; ");
-  const verdict = state.targetIsCulprit
-    ? "Verdict: the target was the culprit."
-    : "Verdict: the target was not the culprit.";
-  return `${verdict} Evidence score: ${score}. Recovered evidence: ${clues}.`;
+  return collected
+    .map((item) => `<div><strong>${itemDisplay[item.kind]}</strong>: ${item.clue}</div>`)
+    .join("");
+}
+
+function finishDeduction(selectedId) {
+  const correct = selectedId === state.culpritScenario.id;
+  const selected = culpritScenarios.find((scenario) => scenario.id === selectedId);
+  const result = correct
+    ? `正解です。犯人は「${state.culpritScenario.name}」でした。`
+    : `不正解です。選んだのは「${selected.name}」ですが、犯人は「${state.culpritScenario.name}」でした。`;
+  endGame(correct, correct ? "解決" : "誤認", `${result} 証拠: ${droppedItems.map((item) => item.clue).join(" / ")}`);
 }
 
 function endGame(success, label, message) {
@@ -408,9 +473,11 @@ function endGame(success, label, message) {
   state.running = false;
   stateLabel.textContent = label;
   hintLabel.textContent = message;
-  overlay.querySelector("h1").textContent = success ? "ミッションクリア" : "尾行失敗";
+  overlay.querySelector("h1").textContent = success ? "ミッションクリア" : label === "誤認" ? "推理失敗" : "尾行失敗";
   overlay.querySelector("p").textContent = message;
   startGuide.style.display = "none";
+  deductionPanel.hidden = true;
+  startButton.hidden = false;
   startButton.textContent = "もう一度プレイ";
   overlay.classList.add("visible");
 }

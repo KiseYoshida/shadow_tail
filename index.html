@@ -36,7 +36,7 @@
             <div id="startGuide" class="start-guide">
               <section>
                 <h2>目的</h2>
-                <p>4つの落とし物を回収するとクリアです。終了後、集めた証拠から対象が犯人だったかどうかを判定します。</p>
+                <p>4つの落とし物を回収すると推理フェーズに進みます。集めた証拠から、どの犯人だったかを選んでください。</p>
               </section>
               <section>
                 <h2>操作</h2>
@@ -51,6 +51,11 @@
                 <h2>ルール</h2>
                 <p>対象が振り返ったら、遮蔽物に隠れるか視線を遮ってください。近づきすぎ・離れすぎ・見られ続けると警戒ゲージが上がります。</p>
               </section>
+            </div>
+            <div id="deductionPanel" class="deduction-panel" hidden>
+              <h2>犯人を推理してください</h2>
+              <div id="evidenceSummary" class="evidence-summary"></div>
+              <div id="suspectChoices" class="suspect-choices"></div>
             </div>
             <button id="startButton" type="button">ミッション開始</button>
           </div>

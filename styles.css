@@ -270,6 +270,43 @@ canvas {
   padding-left: 18px;
 }
 
+.deduction-panel {
+  width: min(100%, 760px);
+  margin: 4px 0 24px;
+}
+
+.evidence-summary {
+  margin-bottom: 14px;
+  border: 1px solid rgba(245, 241, 223, 0.2);
+  border-radius: 6px;
+  padding: 14px;
+  color: rgba(245, 241, 223, 0.92);
+  background: rgba(11, 14, 13, 0.72);
+  font-size: 14px;
+  line-height: 1.55;
+  text-align: left;
+}
+
+.suspect-choices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.suspect-choices button {
+  min-width: 0;
+  min-height: 74px;
+  padding: 10px;
+  color: #f5f1df;
+  background: rgba(19, 20, 17, 0.86);
+  border: 1px solid rgba(247, 208, 95, 0.38);
+  text-align: left;
+}
+
+.suspect-choices button:hover {
+  color: #15130e;
+}
+
 .overlay button {
   min-width: 170px;
   min-height: 48px;
@@ -307,6 +344,10 @@ canvas {
   }
 
   .start-guide {
+    grid-template-columns: 1fr;
+  }
+
+  .suspect-choices {
     grid-template-columns: 1fr;
   }
 }
