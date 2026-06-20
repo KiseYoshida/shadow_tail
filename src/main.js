@@ -17,6 +17,36 @@ const roadTopHalf = 230;
 const maxDepth = 1180;
 const minSafeDistance = 260;
 const maxSafeDistance = 720;
+const itemEvidence = {
+  wallet: {
+    label: "Wallet",
+    culpritScore: 2,
+    innocentScore: 0,
+    culpritClue: "cash from the crime scene",
+    innocentClue: "ordinary receipts",
+  },
+  key: {
+    label: "Key",
+    culpritScore: 1,
+    innocentScore: 0,
+    culpritClue: "a key matching the back entrance",
+    innocentClue: "a house key",
+  },
+  card: {
+    label: "Access Card",
+    culpritScore: 2,
+    innocentScore: 0,
+    culpritClue: "an access card used near the incident",
+    innocentClue: "an expired transit card",
+  },
+  note: {
+    label: "Coded Note",
+    culpritScore: 3,
+    innocentScore: 0,
+    culpritClue: "a coded note naming the meeting point",
+    innocentClue: "a shopping memo",
+  },
+};
 const initialCovers = [
   { id: "pole-1", kind: "pole", side: -1, depth: 220, laneX: -0.64, width: 0.09 },
   { id: "post-1", kind: "postbox", side: 1, depth: 360, laneX: 0.55, width: 0.17 },
@@ -36,6 +66,7 @@ const state = {
   targetSpeed: 46,
   targetAction: "walking",
   actionTimer: 2.5,
+  targetIsCulprit: false,
   itemDropTimer: 1.6,
   itemsDropped: 0,
   itemsCollected: 0,
@@ -63,6 +94,7 @@ function resetGame() {
   state.targetSpeed = 46;
   state.targetAction = "walking";
   state.actionTimer = 2.5;
+  state.targetIsCulprit = Math.random() < 0.5;
   state.itemDropTimer = 1.6;
   state.itemsDropped = 0;
   state.itemsCollected = 0;
@@ -205,7 +237,7 @@ function update(dt) {
   }
 
   if (state.alert >= 1) endGame(false, "CAUGHT", "The target noticed you.");
-  if (state.itemsCollected >= state.requiredItems) endGame(true, "CLEAR", "You recovered every dropped item.");
+  if (state.itemsCollected >= state.requiredItems) endGame(true, "CLEAR", buildInvestigationResult());
 
   moveWorldObjects(worldDelta);
   updateHud();
@@ -244,7 +276,9 @@ function updateTargetBehavior(dt) {
     drifting: 38,
     hurrying: 72,
   };
-  state.targetSpeed += (speedByAction[state.targetAction] - state.targetSpeed) * Math.min(1, dt * 3.8);
+  const culpritSpeedMultiplier = state.targetIsCulprit ? 1.35 : 1;
+  const targetActionSpeed = speedByAction[state.targetAction] * culpritSpeedMultiplier;
+  state.targetSpeed += (targetActionSpeed - state.targetSpeed) * Math.min(1, dt * 3.8);
   state.targetX += (state.targetGoalX - state.targetX) * Math.min(1, dt * 2.4);
 }
 
@@ -272,10 +306,14 @@ function updateDroppedItems(dt, worldDelta) {
 }
 
 function dropItem() {
-  const itemKinds = ["wallet", "key", "card", "note"];
+  const itemKinds = Object.keys(itemEvidence);
+  const kind = itemKinds[Math.floor(Math.random() * itemKinds.length)];
+  const evidence = itemEvidence[kind];
   droppedItems.push({
     id: `item-${state.itemsDropped + 1}`,
-    kind: itemKinds[state.itemsDropped % itemKinds.length],
+    kind,
+    evidenceScore: state.targetIsCulprit ? evidence.culpritScore : evidence.innocentScore,
+    clue: state.targetIsCulprit ? evidence.culpritClue : evidence.innocentClue,
     depth: clamp(state.distance - 85, 240, 780),
     laneX: clamp(state.targetX + (Math.random() - 0.5) * 0.18, -0.48, 0.48),
     spin: Math.random() * Math.PI * 2,
@@ -352,6 +390,16 @@ function coverBlockWidth(kind) {
   if (kind === "vending") return 0.17;
   if (kind === "sign") return 0.13;
   return 0.12;
+}
+
+function buildInvestigationResult() {
+  const collected = droppedItems.filter((item) => item.collected);
+  const score = collected.reduce((total, item) => total + item.evidenceScore, 0);
+  const clues = collected.map((item) => `${itemEvidence[item.kind].label}: ${item.clue}`).join("; ");
+  const verdict = state.targetIsCulprit
+    ? "Verdict: the target was the culprit."
+    : "Verdict: the target was not the culprit.";
+  return `${verdict} Evidence score: ${score}. Recovered evidence: ${clues}.`;
 }
 
 function endGame(success, label, message) {
