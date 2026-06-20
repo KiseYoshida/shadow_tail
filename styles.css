@@ -115,7 +115,7 @@ canvas {
 .hud {
   position: absolute;
   z-index: 5;
-  inset: auto 18px 18px 18px;
+  inset: 18px 18px auto 18px;
   display: grid;
   grid-template-columns: minmax(120px, 180px) minmax(120px, 180px) minmax(90px, 110px) minmax(220px, 1fr);
   gap: 12px;

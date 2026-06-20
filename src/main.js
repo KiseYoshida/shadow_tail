@@ -124,12 +124,6 @@ function moveWorldObjects(delta) {
       cover.kind = ["pole", "postbox", "sign", "vending"][Math.floor(Math.random() * 4)];
       cover.laneX = cover.side * (0.54 + Math.random() * 0.26);
       cover.width = cover.kind === "vending" ? 0.26 : cover.kind === "pole" ? 0.08 : 0.17;
-    } else if (cover.depth > maxDepth + 180) {
-      cover.depth = 120 + Math.random() * 120;
-      cover.side = Math.random() > 0.5 ? 1 : -1;
-      cover.kind = ["pole", "postbox", "sign", "vending"][Math.floor(Math.random() * 4)];
-      cover.laneX = cover.side * (0.54 + Math.random() * 0.26);
-      cover.width = cover.kind === "vending" ? 0.26 : cover.kind === "pole" ? 0.08 : 0.17;
     }
   }
 }
@@ -147,9 +141,16 @@ function update(dt) {
   let worldDelta = 0;
   let playerDistanceChange = 0;
   if (!state.hidden) {
-    state.playerX += horizontal * dt * 0.85;
-    playerDistanceChange = forward * dt * 160;
-    worldDelta = forward * dt * 160;
+    const nextPlayerX = clamp(state.playerX + horizontal * dt * 0.85, -0.88, 0.88);
+    if (!wouldHitCoverLaterally(state.playerX, nextPlayerX)) {
+      state.playerX = nextPlayerX;
+    }
+
+    const requestedWorldDelta = forward * dt * 160;
+    if (!wouldHitCover(state.playerX, requestedWorldDelta)) {
+      playerDistanceChange = requestedWorldDelta;
+      worldDelta = requestedWorldDelta;
+    }
   }
   state.distance += state.targetSpeed * dt - playerDistanceChange;
   state.playerX = clamp(state.playerX, -0.88, 0.88);
@@ -296,6 +297,42 @@ function findNearCover() {
     const xNearPlayer = Math.abs(cover.laneX - px) < cover.width + 0.2;
     return depthNearPlayer && xNearPlayer;
   });
+}
+
+function wouldHitCover(playerX, worldDelta) {
+  return covers.some((cover) => {
+    const currentBlocking = isCoverBlockingPlayer(cover, playerX, cover.depth);
+    const nextDepth = cover.depth - worldDelta;
+    const nextBlocking = isCoverBlockingPlayer(cover, playerX, nextDepth);
+    return nextBlocking && (!currentBlocking || isMovingDeeperIntoCover(cover.depth, nextDepth));
+  });
+}
+
+function wouldHitCoverLaterally(currentX, nextX) {
+  return covers.some((cover) => {
+    const currentBlocking = isCoverBlockingPlayer(cover, currentX, cover.depth);
+    const nextBlocking = isCoverBlockingPlayer(cover, nextX, cover.depth);
+    const movingCloser = Math.abs(cover.laneX - nextX) < Math.abs(cover.laneX - currentX);
+    return nextBlocking && (!currentBlocking || movingCloser);
+  });
+}
+
+function isMovingDeeperIntoCover(currentDepth, nextDepth) {
+  const playerDepth = 92;
+  return Math.abs(nextDepth - playerDepth) < Math.abs(currentDepth - playerDepth);
+}
+
+function isCoverBlockingPlayer(cover, playerX, depth) {
+  const depthOverlap = depth > 48 && depth < 150;
+  const xOverlap = Math.abs(cover.laneX - playerX) < cover.width + coverCollisionWidth(cover.kind);
+  return depthOverlap && xOverlap;
+}
+
+function coverCollisionWidth(kind) {
+  if (kind === "pole") return 0.12;
+  if (kind === "vending") return 0.24;
+  if (kind === "sign") return 0.2;
+  return 0.18;
 }
 
 function hasCoverBlockingSight() {
