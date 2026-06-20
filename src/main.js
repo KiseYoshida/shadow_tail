@@ -11,6 +11,7 @@ const deductionPanel = document.getElementById("deductionPanel");
 const evidenceSummary = document.getElementById("evidenceSummary");
 const suspectChoices = document.getElementById("suspectChoices");
 const startButton = document.getElementById("startButton");
+const titleButton = document.getElementById("titleButton");
 
 const keys = new Set();
 const W = canvas.width;
@@ -138,6 +139,7 @@ function resetGame() {
   droppedItems.splice(0, droppedItems.length);
   deductionPanel.hidden = true;
   suspectChoices.innerHTML = "";
+  titleButton.hidden = true;
   overlay.classList.remove("visible");
 }
 
@@ -478,7 +480,25 @@ function endGame(success, label, message) {
   startGuide.style.display = "none";
   deductionPanel.hidden = true;
   startButton.hidden = false;
+  titleButton.hidden = false;
   startButton.textContent = "もう一度プレイ";
+  overlay.classList.add("visible");
+}
+
+function showTitleScreen() {
+  state.running = false;
+  state.ended = false;
+  state.deductionOpen = false;
+  stateLabel.textContent = "TAILING";
+  hintLabel.textContent = "Move with WASD / Arrows. Hide with Space.";
+  overlay.querySelector("h1").textContent = "Shadow Tail";
+  overlay.querySelector("p").textContent = "尾行対象を追跡し、落としたアイテムをすべて回収してください。";
+  startGuide.style.display = "";
+  deductionPanel.hidden = true;
+  suspectChoices.innerHTML = "";
+  startButton.hidden = false;
+  titleButton.hidden = true;
+  startButton.textContent = "ミッション開始";
   overlay.classList.add("visible");
 }
 
@@ -938,6 +958,7 @@ window.addEventListener("keyup", (event) => {
 });
 
 startButton.addEventListener("click", resetGame);
+titleButton.addEventListener("click", showTitleScreen);
 
 updateHud();
 loop();

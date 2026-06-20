@@ -307,6 +307,13 @@ canvas {
   color: #15130e;
 }
 
+.overlay-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
 .overlay button {
   min-width: 170px;
   min-height: 48px;
@@ -318,8 +325,19 @@ canvas {
   font-weight: 900;
 }
 
+.overlay button.secondary {
+  color: #f5f1df;
+  background: rgba(19, 20, 17, 0.88);
+  border: 1px solid rgba(247, 208, 95, 0.38);
+}
+
 .overlay button:hover {
   background: #ffe17f;
+}
+
+.overlay button.secondary:hover {
+  color: #15130e;
+  background: #f7d05f;
 }
 
 @media (max-width: 760px) {
